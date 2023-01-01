@@ -1,0 +1,78 @@
+#!/bin/bash
+#
+# Copyright 2000-2021 the Rosegarden development team.
+#
+# Other copyrights also apply to some parts of this work.  Please
+# see the AUTHORS file and individual file headers for details.
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License as
+# published by the Free Software Foundation; either version 2 of the
+# License, or (at your option) any later version.  See the file
+# COPYING included with this distribution for more information.
+
+# make-release-tarball
+
+# This script transforms a snapshot downloaded from sourceforge into
+# a release tarball.  To get a snapshot, click the "Download Snapshot"
+# button on the git repo page then run this script against that .zip file.
+
+if [ $# != 1 ]; then
+    echo "FATAL: Need a snapshot filename."
+    exit 1
+fi
+
+readonly snapshot=$1
+
+if [ ! -f "$snapshot" ]; then
+    echo "FATAL: $snapshot does not exist"
+    exit 1
+fi
+
+unzip "$snapshot"
+
+readonly snapshotdir=${snapshot%.zip}
+cd "$snapshotdir"
+
+# Get the version number from CMakeLists.txt
+readonly version=$(grep ROSEGARDEN_VERSION CMakeLists.txt|cut -d \" -f 2|sed 's/ //g')
+
+# Change to a stable release.
+sed -i "s/UNSTABLE/STABLE/" CMakeLists.txt
+
+cd ..
+
+readonly finalname="rosegarden-$version"
+if [ -d "$finalname" ]; then
+    echo "FATAL: Directory $finalname already exists."
+    # clean up
+    rm -rf "$snapshotdir"
+    exit 1
+fi
+
+mv "$snapshotdir" "$finalname"
+
+readonly tarballname="$finalname.tar.bz2"
+if [ -f "$tarballname" ]; then
+    echo "FATAL: $tarballname already exists."
+    # clean up
+    rm -rf "$finalname"
+    exit 1
+fi
+
+echo "Creating tarball $tarballname..."
+
+tar cjf "$tarballname" "$finalname"
+if [ $? != "0" ]; then
+    echo "FATAL: tar failed."
+    # clean up
+    rm -rf "$finalname"
+    exit 1
+fi
+
+echo "Cleaning up..."
+
+rm -rf "$finalname"
+
+echo "Don't forget to tag the release..."
+
